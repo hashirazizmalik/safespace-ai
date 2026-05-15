@@ -6,7 +6,7 @@ A machine learning–powered web app that analyzes text input and detects signs 
 
 ## Live Demo
 
-Deployed on Vercel: [safespace-ai.vercel.app](https://safespace-ai.vercel.app)
+Deployed on Vercel: [safespace-ai.vercel.app](https://safespace-ai-nu.vercel.app/)
 
 ---
 
