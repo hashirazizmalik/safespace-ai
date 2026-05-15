@@ -2,7 +2,6 @@ print("STEP 1: The script has started running!")
 
 from flask import Flask, request, jsonify, render_template
 import joblib
-import pandas as pd
 import numpy as np
 import os
 import re
@@ -14,12 +13,13 @@ from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 import traceback
 
-# 1. NLTK downloads
-nltk.download('vader_lexicon', quiet=True)
-nltk.download('punkt', quiet=True)
-nltk.download('punkt_tab', quiet=True)
-nltk.download('stopwords', quiet=True)
-nltk.download('wordnet', quiet=True)
+# 1. NLTK downloads — use /tmp on Vercel (read-only filesystem except /tmp)
+NLTK_DATA_PATH = '/tmp/nltk_data'
+os.makedirs(NLTK_DATA_PATH, exist_ok=True)
+nltk.data.path.insert(0, NLTK_DATA_PATH)
+
+for corpus in ['vader_lexicon', 'punkt', 'punkt_tab', 'stopwords', 'wordnet']:
+    nltk.download(corpus, download_dir=NLTK_DATA_PATH, quiet=True)
 
 # 2. Flask app
 app = Flask(__name__)
