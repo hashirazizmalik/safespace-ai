@@ -139,6 +139,17 @@ def predict():
         probabilities = model.predict_proba(features)[0]
         confidence = max(probabilities) * 100
 
+        # Confidence threshold — avoid committing to a wrong category
+        if confidence < 55.0:
+            return jsonify({
+                "category": "Uncertain",
+                "confidence": f"{confidence:.1f}%",
+                "probabilities": {
+                    cls: round(float(prob) * 100, 1)
+                    for cls, prob in zip(model.classes_, probabilities)
+                }
+            })
+
         return jsonify({
             "category": str(prediction),
             "confidence": f"{confidence:.1f}%",
