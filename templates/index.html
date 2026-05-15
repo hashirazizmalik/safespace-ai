@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mental Health Support Chatbot</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0d0d14;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .chat-container {
+            width: 480px;
+            background: #13131f;
+            border-radius: 12px;
+            box-shadow: 0 4px 40px rgba(0,0,0,0.6);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .chat-header {
+            background-color: #1a1a2e;
+            color: #e0e0f0;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .chat-box {
+            height: 520px;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #0f0f1a;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .message {
+            max-width: 85%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        .user-message {
+            background-color: #4f46e5;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+        .bot-message {
+            background-color: #1e1e2e;
+            color: #c8c8d8;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        /* Radar chart card */
+        .radar-card {
+            align-self: flex-start;
+            background: #1a1a2a;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 8px 8px 0 8px;
+            width: 300px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        }
+        .radar-card .radar-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #555570;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 4px 4px 0 4px;
+        }
+        .radar-chart-div {
+            width: 100%;
+            height: 220px;
+        }
+
+        /* Confidence badge strip */
+        .score-strip {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            padding: 0 4px 8px 4px;
+        }
+        .score-badge {
+            font-size: 0.72rem;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .input-area {
+            display: flex;
+            padding: 10px;
+            background: #13131f;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            outline: none;
+            font-size: 0.95rem;
+            background: #1e1e2e;
+            color: #e0e0f0;
+        }
+        #user-input::placeholder { color: #44445a; }
+        #user-input:focus { border-color: rgba(99,102,241,0.5); }
+        #send-btn {
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-left: 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #send-btn:hover { background-color: #4338ca; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">SafeSpace AI</div>
+    <div class="chat-box" id="chat-box">
+        <div class="message bot-message">
+            Hi there. I am a safe, stigma-free space. How are you feeling today? You can vent or share whatever is on your mind.
+        </div>
+    </div>
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="Type your feelings here..." onkeypress="handleKeyPress(event)">
+        <button id="send-btn" onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    // Color map per emotion category
+    const CATEGORY_COLORS = {
+        'Anxiety':    { fill: 'rgba(29,158,117,0.15)', line: '#1D9E75', badge: '#e1f5ee', text: '#0F6E56' },
+        'Depression': { fill: 'rgba(127,119,221,0.15)', line: '#7F77DD', badge: '#EEEDFE', text: '#3C3489' },
+        'Stress':     { fill: 'rgba(216,90,48,0.15)',  line: '#D85A30', badge: '#FAECE7', text: '#712B13' },
+        'Normal':     { fill: 'rgba(136,135,128,0.15)', line: '#888780', badge: '#F1EFE8', text: '#444441' },
+        'Neutral greeting / State': { fill: 'rgba(136,135,128,0.15)', line: '#888780', badge: '#F1EFE8', text: '#444441' },
+        'Positive / Joy':           { fill: 'rgba(99,153,34,0.15)',  line: '#639922', badge: '#EAF3DE', text: '#27500A' },
+    };
+
+    const DEFAULT_COLOR = { fill: 'rgba(74,144,226,0.15)', line: '#4a90e2', badge: '#e8f0fb', text: '#185FA5' };
+
+    let radarCounter = 0;
+
+    async function sendMessage() {
+        const inputField = document.getElementById('user-input');
+        const text = inputField.value.trim();
+        if (!text) return;
+
+        appendMessage(text, 'user-message');
+        inputField.value = '';
+
+        const typingId = appendMessage('Analyzing...', 'bot-message');
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+
+            const data = await response.json();
+            document.getElementById(typingId).remove();
+
+            if (data.error) {
+                appendMessage("Sorry, I encountered an error. Please try again.", 'bot-message');
+                return;
+            }
+
+            // Text reply
+            let reply = `Based on what you shared, my analysis detects signs of <strong>${data.category}</strong> (Confidence: ${data.confidence}). `;
+            reply += data.category === 'Normal' || data.category === 'Neutral greeting / State' || data.category === 'Positive / Joy'
+                ? "You seem to be doing okay, but I'm always here if you need to talk."
+                : "Please remember that I am an AI, not a doctor. Consider reaching out to a mental health professional or a trusted loved one.";
+
+            appendMessage(reply, 'bot-message', true);
+
+            // Radar chart if probabilities returned
+            if (data.probabilities) {
+                appendRadar(data.probabilities, data.category);
+            }
+
+        } catch (error) {
+            document.getElementById(typingId).remove();
+            appendMessage("Error connecting to the server.", 'bot-message');
+        }
+    }
+
+    function appendRadar(probabilities, predictedCategory) {
+        const chatBox = document.getElementById('chat-box');
+        const colors = CATEGORY_COLORS[predictedCategory] || DEFAULT_COLOR;
+
+        // Build radar card
+        const card = document.createElement('div');
+        card.className = 'radar-card';
+
+        const title = document.createElement('div');
+        title.className = 'radar-title';
+        title.textContent = 'Emotion breakdown';
+        card.appendChild(title);
+
+        const chartId = 'radar-' + (++radarCounter);
+        const chartDiv = document.createElement('div');
+        chartDiv.className = 'radar-chart-div';
+        chartDiv.id = chartId;
+        card.appendChild(chartDiv);
+
+        // Score badges strip
+        const strip = document.createElement('div');
+        strip.className = 'score-strip';
+        for (const [label, score] of Object.entries(probabilities)) {
+            const c = CATEGORY_COLORS[label] || DEFAULT_COLOR;
+            const badge = document.createElement('span');
+            badge.className = 'score-badge';
+            badge.style.background = c.badge;
+            badge.style.color = c.text;
+            badge.textContent = `${label}: ${score}%`;
+            strip.appendChild(badge);
+        }
+        card.appendChild(strip);
+
+        chatBox.appendChild(card);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // Draw Plotly radar
+        const labels = Object.keys(probabilities);
+        const values = Object.values(probabilities);
+        // Close the polygon
+        const closedLabels = [...labels, labels[0]];
+        const closedValues = [...values, values[0]];
+
+        Plotly.newPlot(chartId, [{
+            type: 'scatterpolar',
+            r: closedValues,
+            theta: closedLabels,
+            fill: 'toself',
+            fillcolor: colors.fill,
+            line: { color: colors.line, width: 2 },
+            marker: { color: colors.line, size: 5 },
+            hovertemplate: '<b>%{theta}</b><br>%{r:.1f}%<extra></extra>'
+        }], {
+            polar: {
+                bgcolor: 'rgba(0,0,0,0)',
+                radialaxis: {
+                    visible: true,
+                    range: [0, 100],
+                    tickfont: { size: 9, color: '#555570' },
+                    gridcolor: 'rgba(255,255,255,0.06)',
+                    linecolor: 'rgba(255,255,255,0.06)'
+                },
+                angularaxis: {
+                    tickfont: { size: 11, color: '#8888aa' },
+                    gridcolor: 'rgba(255,255,255,0.06)',
+                    linecolor: 'rgba(255,255,255,0.06)'
+                }
+            },
+            margin: { t: 20, b: 20, l: 40, r: 40 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            showlegend: false
+        }, { displayModeBar: false, responsive: true });
+    }
+
+    function appendMessage(text, className, isHTML = false) {
+        const chatBox = document.getElementById('chat-box');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${className}`;
+        msgDiv.id = 'msg-' + Date.now();
+        isHTML ? (msgDiv.innerHTML = text) : (msgDiv.textContent = text);
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return msgDiv.id;
+    }
+
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    }
+</script>
+
+</body>
+</html>
