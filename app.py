@@ -133,6 +133,23 @@ def predict():
                 "probabilities": {"Anxiety": 1.7, "Depression": 1.7, "Normal": 95.0, "Stress": 1.6}
             })
 
+        # Rule 3: General positive statements without distress words
+        # Catch sentences like "I love iqbals poetry"
+        if compound_score >= 0.4 and not has_distress:
+            return jsonify({
+                "category": "Positive / Joy",
+                "confidence": "85.0%",
+                "probabilities": {"Anxiety": 5.0, "Depression": 5.0, "Normal": 85.0, "Stress": 5.0}
+            })
+
+        # Rule 4: Neutral normal statements without distress words
+        if -0.1 <= compound_score < 0.4 and not has_distress and word_count <= 10:
+            return jsonify({
+                "category": "Normal",
+                "confidence": "75.0%",
+                "probabilities": {"Anxiety": 8.0, "Depression": 8.0, "Normal": 75.0, "Stress": 9.0}
+            })
+
         # Everything else — ML model decides
         features = extract_live_features(user_message)
         prediction = model.predict(features)[0]
